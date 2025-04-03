@@ -1,0 +1,16 @@
+# Python 관련
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+
+# Jupyter Notebook 체크포인트
+.ipynb_checkpoints/
+
+# MacOS 관련
+.DS_Store
+
+# Windows 관련
+Thumbs.db
