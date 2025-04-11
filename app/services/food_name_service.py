@@ -46,8 +46,8 @@ class FoodNameService:
         음식 리스트:"""
 
         self.nutrition_prompt = """
-        아래 음식 리스트를 한 끼 식사로 가정하고, 영양사의 관점에서 단백질(g), 지방(g), 탄수화물(g), 식이섬유(g), 칼슘(mg), 나트륨(mg)의 영양소 양을 분석해줘. 다른 영양소는 언급하지 마.
-        그런 다음, 일반적인 성인의 균형 잡힌 식단 기준(단백질 50g, 지방 50g, 탄수화물 130g, 식이섬유 25g, 칼슘 1000mg, 나트륨 2000mg)을 바탕으로 부족한 영양소를 판단하고, 그 부족한 영양소를 보충할 수 있는 다음 끼니 식단을 음식종류 3가지만 사용해서 제안해줘.
+        아래 음식 리스트를 한 끼 식사로 가정하고, 영양사의 관점에서 단백질(g), 탄수화물(g), 수분(ml), 당류(g), 지방(g), 식이섬유(g), 나트륨(mg)의 영양소 양을 분석해줘. 다른 영양소는 언급하지 마.
+        그런 다음, 일반적인 성인의 균형 잡힌 식단 기준(단백질 25g, 탄수화물 100g, 수분 500ml, 당류 15g, 지방 25g, 식이섬유 10g, 나트륨 650mg)을 바탕으로 부족한 영양소를 판단하고, 그 부족한 영양소를 보충할 수 있는 다음 끼니 식단을 음식종류 딱 한가지만 제안해주고 샐러드가 붙는 요리는 제안에서 제외해.(식재료 말고 요리로 제안 ex)두부 스테이크).
         제안할 때 '뼈해장국'은 항상 빼줘.
         반드시 JSON 형식으로만 반환하고, 추가 설명이나 텍스트는 절대 붙이지 마. JSON 외의 내용이 있으면 결과가 파싱되지 않으니 주의해. JSON 키는 반드시 영문 소문자와 스네이크 케이스(예: food_list)를 사용해줘.
 
@@ -58,14 +58,15 @@ class FoodNameService:
           "food_list": ["김밥", "국밥"],
           "nutrition": {{
             "protein": 20.0,
-            "fat": 15.0,
             "carbohydrate": 60.0,
+            "water": 400.0,
+            "sugar": 15.0,
+            "fat": 15.0,
             "fiber": 5.0,
-            "calcium": 200.0,
             "sodium": 1500.0
           }},
-          "deficient_nutrients": ["protein", "fiber", "calcium"],
-          "next_meal_suggestion": ["닭가슴살 샐러드", "아몬드"]
+          "deficient_nutrients": ["탄수화물", "식이섬유", "수분"],
+          "next_meal_suggestion": ["곤약 비빔국수"]
         }}
         """ # 예시의 next_meal_suggestion 도 리스트로 변경 (선택사항)
 
@@ -119,7 +120,7 @@ class FoodNameService:
             print("--- [FoodNameService] 영양 분석 및 제안 종료 (입력 없음) ---")
             return {
                 "food_list": [],
-                "nutrition": {"protein": 0, "fat": 0, "carbohydrate": 0, "fiber": 0, "calcium": 0, "sodium": 0},
+                "nutrition": {"protein": 0, "carbohydrate": 0, "water": 0, "sugar": 0, "fat": 0, "fiber": 0, "sodium": 0},
                 "deficient_nutrients": [],
                 "next_meal_suggestion": [] # 빈 리스트 반환
             }
