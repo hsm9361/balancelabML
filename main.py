@@ -1,7 +1,7 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import hPrediction_router
+from app.routers import hPrediction_router, diet_recommendation_router
 from app.routers import diet_analysis_router
 app = FastAPI(
     title="Health Prediction API",
@@ -21,6 +21,7 @@ app.add_middleware(
 # 라우터 등록
 app.include_router(hPrediction_router.router)
 app.include_router(diet_analysis_router.router)
+app.include_router(diet_recommendation_router.router)
 
 @app.get("/")
 async def root():
