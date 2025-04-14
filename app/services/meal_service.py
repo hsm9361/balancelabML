@@ -39,17 +39,23 @@ model = genai.GenerativeModel("gemini-1.5-flash")
 # 파일 경로 검증
 def validate_file_path(file_path: str) -> str:
     try:
-        full_path = Path(file_path).resolve()
-        base_dir = Path(ALLOWED_IMAGE_DIR).resolve()
-        if not full_path.is_relative_to(base_dir):
-            raise ValueError(f"파일 경로가 허용된 디렉토리({base_dir}) 내에 있어야 합니다.")
-        if not full_path.exists():
+        # 입력 경로를 Path 객체로 변환
+        input_path = Path(file_path)
+        
+        # 상대 경로면 현재 작업 디렉토리를 기준으로 절대 경로로 변환
+        if not input_path.is_absolute():
+            input_path = (Path.cwd() / input_path).resolve()
+        else:
+            input_path = input_path.resolve()
+
+        # 파일 존재 여부 확인
+        if not input_path.exists():
             raise FileNotFoundError(f"파일 {file_path}을 찾을 수 없습니다.")
-        if not full_path.is_file():
+        if not input_path.is_file():
             raise ValueError(f"{file_path}은 파일이 아닙니다.")
-        if full_path.suffix.lower() not in [".jpg", ".jpeg", ".png"]:
+        if input_path.suffix.lower() not in [".jpg", ".jpeg", ".png"]:
             raise ValueError("지원되지 않는 파일 형식입니다. JPG 또는 PNG만 허용됩니다.")
-        return str(full_path)
+        return str(input_path)
     except Exception as e:
         raise ValueError(f"파일 경로 검증 실패: {str(e)}")
 
