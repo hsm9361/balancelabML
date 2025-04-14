@@ -1,3 +1,4 @@
+import platform
 import os
 import json
 from PIL import Image
@@ -9,8 +10,27 @@ from pathlib import Path
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ALLOWED_IMAGE_DIR = os.getenv("ALLOWED_IMAGE_DIR")
+
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.")
+
+# 운영 체제별 기본 경로 설정
+if not ALLOWED_IMAGE_DIR:
+    if platform.system() == "Windows":
+        ALLOWED_IMAGE_DIR = Path("C:/Uploads")
+    else:  # macOS, Linux
+        ALLOWED_IMAGE_DIR = Path("/Users/hongsamyung/uploads")
+else:
+    ALLOWED_IMAGE_DIR = Path(ALLOWED_IMAGE_DIR)
+
+# ALLOWED_IMAGE_DIR 처리
+ALLOWED_IMAGE_DIR = ALLOWED_IMAGE_DIR.resolve()
+if not ALLOWED_IMAGE_DIR.exists():
+    ALLOWED_IMAGE_DIR.mkdir(parents=True, exist_ok=True)  # 디렉토리 자동 생성
+if not ALLOWED_IMAGE_DIR.is_dir():
+    raise ValueError(f"ALLOWED_IMAGE_DIR은 디렉토리가 아닙니다: {ALLOWED_IMAGE_DIR}")
+
+print(f"Using ALLOWED_IMAGE_DIR: {ALLOWED_IMAGE_DIR}")  # 디버깅용
 
 # Gemini API 설정
 genai.configure(api_key=GEMINI_API_KEY)
