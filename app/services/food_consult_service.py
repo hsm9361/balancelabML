@@ -4,6 +4,8 @@ import os
 import requests  # requests 라이브러리 추가
 from dotenv import load_dotenv
 from typing import Any, Dict
+import re
+import json
 
 load_dotenv(dotenv_path=".env")
 gemini_apikey = os.environ.get("GEMINI_API_KEY")
@@ -32,8 +34,10 @@ class EnhancedQueryGenerator:
             "x-goog-api-key": gemini_apikey  # .env에서 로드된 API 키 사용
         }
 
-    def _call_gemini_api(self, prompt: str) -> str:
-        """Gemini API 호출"""
+    
+
+    def _call_gemini_api(self, prompt: str) -> dict:
+        """Gemini API 호출 및 JSON 파싱"""
         try:
             data = {"contents": [{"parts": [{"text": prompt}]}]}
             response = requests.post(self.api_url, headers=self.headers, json=data)
@@ -46,17 +50,30 @@ class EnhancedQueryGenerator:
             result = response.json()
 
             try:
-                return result["candidates"][0]["content"]["parts"][0]["text"]
+                raw_text = result["candidates"][0]["content"]["parts"][0]["text"]
+                print("🧪 Gemini 응답 텍스트:", raw_text[:200], "...")  # 앞부분만 출력
+
+                # 코드블럭 제거
+                json_str = re.sub(r"^```json\s*|\s*```$", "", raw_text.strip())
+
+                # JSON 파싱
+                parsed_json = json.loads(json_str)
+                return parsed_json  # ✅ dict 형태로 반환
+
             except (KeyError, IndexError) as e:
                 print(f"❌ 응답 파싱 오류: {e}")
-                return "Gemini 응답 파싱 중 문제가 발생했습니다."
+                return {"error": "Gemini 응답 파싱 중 문제가 발생했습니다."}
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON 디코딩 오류: {e}")
+                return {"error": f"JSON 파싱 실패: {e}"}
 
         except requests.exceptions.RequestException as e:
             print(f"❌ Gemini API 호출 오류 (네트워크/HTTP): {e}")
-            return f"Gemini API 호출 오류: {e}"
+            return {"error": f"Gemini API 호출 오류: {e}"}
         except Exception as e:
             print(f"❌ Gemini API 호출 오류 (기타): {str(e)}")
-            return f"Gemini API 호출 오류: {str(e)}"
+            return {"error": f"Gemini API 호출 오류: {e}"}
+
 
 # 쿼리 결과 반환
 def get_schema_info():
@@ -81,36 +98,39 @@ def get_user_health_data(email: str) -> Dict[str, Any]:
         with engine.connect() as conn:
             query = text("""
             SELECT 
-                (SELECT COALESCE(diabetes_proba, 0) FROM tb_predict_record 
-                    WHERE member_id = m.id ORDER BY reg_date DESC LIMIT 1) AS diabetes_proba,
-                (SELECT COALESCE(hypertension_proba, 0) FROM tb_predict_record 
-                    WHERE member_id = m.id ORDER BY reg_date DESC LIMIT 1) AS hypertension_proba,
-                (SELECT COALESCE(cvd_proba, 0) FROM tb_predict_record 
-                    WHERE member_id = m.id ORDER BY reg_date DESC LIMIT 1) AS cvd_proba,
-                (SELECT GROUP_CONCAT(DISTINCT food_name) FROM dailydiet_record 
-                    WHERE user_id = m.id AND ins_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) AS recent_foods,
-                (SELECT GROUP_CONCAT(DISTINCT category) FROM dailydiet_record 
-                    WHERE user_id = m.id AND ins_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) AS category,
-                (SELECT AVG(calories) FROM tb_daily_record 
-                    WHERE member_id = m.id AND reg_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) AS avg_calories,
-                (SELECT AVG(protein) FROM tb_daily_record 
-                    WHERE member_id = m.id AND reg_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) AS avg_protein,
-                (SELECT AVG(carbo) FROM tb_daily_record 
-                    WHERE member_id = m.id AND reg_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) AS avg_carbo,
-                (SELECT AVG(fat) FROM tb_daily_record 
-                    WHERE member_id = m.id AND reg_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) AS avg_fat,
-                (SELECT AVG(fibrin) FROM tb_daily_record 
-                    WHERE member_id = m.id AND reg_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) AS avg_fibrin,
-                (SELECT AVG(sugar) FROM tb_daily_record 
-                    WHERE member_id = m.id AND reg_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) AS avg_sugar,
-                (SELECT AVG(water) FROM tb_daily_record 
-                    WHERE member_id = m.id AND reg_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) AS avg_water,
-                (SELECT AVG(sodium) FROM tb_daily_record 
-                    WHERE member_id = m.id AND reg_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) AS avg_sodium,
-                goal,
-                id
+                COALESCE(pr.diabetes_proba, 0) AS diabetes_proba,
+                COALESCE(pr.hypertension_proba, 0) AS hypertension_proba,
+                COALESCE(pr.cvd_proba, 0) AS cvd_proba,
+                GROUP_CONCAT(DISTINCT dr.food_name) AS recent_foods,
+                GROUP_CONCAT(DISTINCT dr.category) AS category,
+                AVG(tr.calories) AS avg_calories,
+                AVG(tr.protein) AS avg_protein,
+                AVG(tr.carbo) AS avg_carbo,
+                AVG(tr.fat) AS avg_fat,
+                AVG(tr.fibrin) AS avg_fibrin,
+                AVG(tr.sugar) AS avg_sugar,
+                AVG(tr.water) AS avg_water,
+                AVG(tr.sodium) AS avg_sodium,
+                m.goal,
+                m.id
             FROM tb_members m
+            LEFT JOIN (
+                SELECT member_id, diabetes_proba, hypertension_proba, cvd_proba
+                FROM tb_predict_record
+                WHERE (member_id, reg_date) IN (
+                    SELECT member_id, MAX(reg_date)
+                    FROM tb_predict_record
+                    GROUP BY member_id
+                )
+            ) pr ON pr.member_id = m.id
+            LEFT JOIN dailydiet_record dr 
+                ON dr.user_id = m.id 
+                AND dr.ins_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
+            LEFT JOIN tb_daily_record tr 
+                ON tr.member_id = m.id 
+                AND tr.reg_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
             WHERE m.email = :email
+            GROUP BY m.id, m.goal, pr.diabetes_proba, pr.hypertension_proba, pr.cvd_proba;
             """)
             
             result = pd.read_sql(query, conn, params={"email": email})
@@ -170,17 +190,28 @@ def process_question(question: str, email: str) -> str:
         4. 최근 섭취한 음식을 고려한 다양성 확보
         5. 아침, 점심, 저녁, 간식에 대한 구체적인 추천
         6. 주의사항 및 권장사항
-
-        추천은 다음 형식으로 작성해주세요:
-        1. 건강 위험도 분석 (당뇨, 고혈압, 심혈관질환 확률이 만약 75%가 넘는다면 같이 출력)
-        2. 목표 기반 추천
-        3. 식단 추천 (아침, 점심, 저녁, 간식)
-        4. 주의사항
+        
+        !!!
+        다음 형식으로 응답을 **반드시 .json형식**으로 작성해주세요.
+        
+        ```json
+        {{
+            "건강 위험도 분석": "여기에 건강 위험도 분석 결과 작성"(위험도 또한 %로 출력 / 저장된 내용이 없으면 예측 권장),
+            "목표 기반 추천": "여기에 목표 기반 추천 작성",
+            "식단 추천": {{
+                "아침": ["추천 1", "추천 2", ...],
+                "점심": ["추천 1", "추천 2", ...],
+                "저녁": ["추천 1", "추천 2", ...],
+                "간식": ["추천 1", "추천 2", ...]
+            }},
+            "주의사항": "여기에 주의사항 작성"
+        }}
         """
         
         # Gemini API로 답변 생성
         query_generator = EnhancedQueryGenerator()
         answer = query_generator._call_gemini_api(prompt)
+        print(f"🧪 Gemini 응답 내용: {answer}")
         
         return answer
         
