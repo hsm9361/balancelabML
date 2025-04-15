@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from app.services.food_consult_service import process_question
+from fastapi.responses import JSONResponse
 
 router = APIRouter(
     prefix="/diet",
@@ -26,12 +27,10 @@ async def get_diet_recommendation(request: DietRecommendationRequest):
     """
     try:
         # 식단 추천 생성
+        
         recommendation = process_question(request.question, request.email)
         
-        return {
-            "status": "success",
-            "data": recommendation
-        }
+        return JSONResponse(content={"data":recommendation})
     except Exception as e:
         import traceback
         traceback.print_exc()
