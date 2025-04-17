@@ -11,15 +11,25 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ALLOWED_IMAGE_DIR = os.getenv("ALLOWED_IMAGE_DIR")
 
+def get_upload_path(upload_dir='uploads') -> Path:
+    # 사용자 홈 디렉토리 경로 얻기 (운영체제에 따라 자동 처리됨)
+    home_dir = Path.home()
+    upload_path = home_dir / upload_dir
+
+    # uploads 디렉토리가 없다면 생성
+    upload_path.mkdir(parents=True, exist_ok=True)
+    
+    return upload_path
+
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.")
 
 # 운영 체제별 기본 경로 설정
 if not ALLOWED_IMAGE_DIR:
     if platform.system() == "Windows":
-        ALLOWED_IMAGE_DIR = Path("C:/Uploads")
+        ALLOWED_IMAGE_DIR = get_upload_path
     else:  # macOS, Linux
-        ALLOWED_IMAGE_DIR = Path("/Users/hongsamyung/uploads")
+        ALLOWED_IMAGE_DIR = get_upload_path
 else:
     ALLOWED_IMAGE_DIR = Path(ALLOWED_IMAGE_DIR)
 
