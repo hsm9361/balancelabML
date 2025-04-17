@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers import hPrediction_router, diet_recommendation_router
 from app.routers import diet_analysis_router
 from app.routers import meal_analysis_router
+from app.routers import nutrition_calculate_router
 from dotenv import load_dotenv
 
 
@@ -28,6 +29,7 @@ app.include_router(hPrediction_router.router)
 app.include_router(diet_analysis_router.router)
 app.include_router(meal_analysis_router.router)
 app.include_router(diet_recommendation_router.router)
+app.include_router(nutrition_calculate_router.router)
 
 @app.get("/")
 async def root():
