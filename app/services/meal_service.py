@@ -75,22 +75,44 @@ def analyze_meal(file_path: str) -> list:
     # Gemini API 호출
     prompt = """
     이 식단 이미지를 분석하여 다음 정보를 JSON 형식으로 제공해 주세요:
-    [
-        {
-            "food_name": "음식 이름",
-            "calories": 숫자,
-            "nutrients": {
-                "carbohydrates": 숫자,
-                "fat": 숫자,
-                "sugar": 숫자,
-                "sodium": 숫자,
-                "fiber": 숫자,
-                "water": 숫자
+    {
+        "nutrition_data": [
+            {
+                "food": "음식 이름",
+                "calories": 숫자,
+                "nutrients": {
+                    "protein": 숫자,
+                    "carbohydrates": 숫자,
+                    "fat": 숫자,
+                    "sugar": 숫자,
+                    "sodium": 숫자,
+                    "fiber": 숫자,
+                    "water": 숫자
+                }
             }
-        }
-    ]
+        ],
+        "total_nutrition": {
+            "calories": 숫자,
+            "protein": 숫자,
+            "carbohydrates": 숫자,
+            "fat": 숫자,
+            "sugar": 숫자,
+            "sodium": 숫자,
+            "fiber": 숫자,
+            "water": 숫자
+        },
+        "deficient_nutrients": [
+            "부족한 영양소 이름"
+        ],
+        "next_meal_suggestion": [
+            "다음 식사 제안 음식 이름"
+        ]
+    }
     단위는 grams(g) 또는 milligrams(mg)로, 1인분 기준으로 추정해 주세요.
-    음식이 여러 개라면 배열에 각 음식별로 추가해 주세요.
+    음식이 여러 개라면 nutrition_data 배열에 각 음식별로 추가해 주세요.
+    total_nutrition은 모든 음식의 영양소를 합산한 값입니다.
+    deficient_nutrients는 부족한 영양소를 분석하여 나열합니다.
+    next_meal_suggestion은 부족한 영양소를 보충할 수 있는 음식을 제안합니다.
     다른 텍스트나 코멘트는 포함시키지 마세요.
     """
     try:

@@ -5,6 +5,8 @@ from app.routers import hPrediction_router, diet_recommendation_router
 from app.routers import diet_analysis_router
 from app.routers import meal_analysis_router
 from dotenv import load_dotenv
+
+
 load_dotenv(dotenv_path=".env")
 app = FastAPI(
     title="Health Prediction API",
@@ -33,3 +35,4 @@ async def root():
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    
