@@ -12,7 +12,7 @@ gemini_apikey = os.environ.get("GEMINI_API_KEY")
 root = os.environ.get("root")
 
 # DB 연결 설정
-DB_URL = f"mysql+pymysql://root:{root}@192.168.0.32:3306/balancelab"
+DB_URL = f"mysql+pymysql://springuser:springpassword@localhost:3306/balancelab"
 engine = create_engine(DB_URL)
 
 # DB 연결 설정 (본인의 환경에 맞게 수정)
@@ -102,7 +102,7 @@ def get_user_health_data(email: str) -> Dict[str, Any]:
                 COALESCE(pr.hypertension_proba, 0) AS hypertension_proba,
                 COALESCE(pr.cvd_proba, 0) AS cvd_proba,
                 GROUP_CONCAT(DISTINCT dr.food_name) AS recent_foods,
-                GROUP_CONCAT(DISTINCT dr.category) AS category,
+                GROUP_CONCAT(DISTINCT dr.meal_time) AS meal_time,
                 AVG(tr.calories) AS avg_calories,
                 AVG(tr.protein) AS avg_protein,
                 AVG(tr.carbo) AS avg_carbo,
@@ -115,7 +115,7 @@ def get_user_health_data(email: str) -> Dict[str, Any]:
                 m.gender,
                 m.height,
                 m.weight,
-                m.goal,
+                m.goal_weight,
                 m.id
             FROM tb_members m
             LEFT JOIN (
@@ -127,14 +127,14 @@ def get_user_health_data(email: str) -> Dict[str, Any]:
                     GROUP BY member_id
                 )
             ) pr ON pr.member_id = m.id
-            LEFT JOIN dailydiet_record dr 
-                ON dr.user_id = m.id 
-                AND dr.ins_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
-            LEFT JOIN tb_daily_record tr 
+            LEFT JOIN tb_food_record dr 
+                ON dr.member_id = m.id 
+                AND dr.consumed_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
+            LEFT JOIN tb_daily_nutrition_record tr 
                 ON tr.member_id = m.id 
-                AND tr.reg_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
+                AND tr.consumed_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
             WHERE m.email = :email
-            GROUP BY m.id, m.goal, pr.diabetes_proba, pr.hypertension_proba, pr.cvd_proba;
+            GROUP BY m.id, m.goal_weight, pr.diabetes_proba, pr.hypertension_proba, pr.cvd_proba;
             """)
             
             result = pd.read_sql(query, conn, params={"email": email})
@@ -158,7 +158,7 @@ def process_question(question: str, email: str) -> str:
             return health_data["error"]
         
         # health_data 내용 검증
-        if not all(key in health_data for key in ['diabetes_proba', 'goal']):
+        if not all(key in health_data for key in ['diabetes_proba', 'goal_weight']):
             return "건강 데이터에 필요한 정보가 누락되었습니다."
         
         # Gemini 프롬프트 생성
@@ -173,7 +173,7 @@ def process_question(question: str, email: str) -> str:
         
         2. 최근 식단:
            - 섭취한 음식: {health_data['recent_foods']}
-           - 식사 유형: {health_data['category']}
+           - 식사 유형: {health_data['meal_time']}
         
         3. 영양소 섭취량 (평균):
            - 칼로리: {health_data['avg_calories']} kcal
@@ -189,7 +189,7 @@ def process_question(question: str, email: str) -> str:
            - 현재 성별: {health_data['gender']}
            - 현재 키: {health_data['height']}
            - 현재 체중: {health_data['weight']}
-           - 목표 체중: {health_data['goal']}
+           - 목표 체중: {health_data['goal_weight']}
 
         다음 사항을 고려하여 추천해주세요:
         1. 사용자의 건강 위험도에 따른 식단 조절
