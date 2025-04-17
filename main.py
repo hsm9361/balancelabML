@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import hPrediction_router, diet_recommendation_router
 from app.routers import diet_analysis_router
+from app.routers import nutrition_calculate_router
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=".env")
 app = FastAPI(
@@ -24,6 +25,7 @@ app.add_middleware(
 app.include_router(hPrediction_router.router)
 app.include_router(diet_analysis_router.router)
 app.include_router(diet_recommendation_router.router)
+app.include_router(nutrition_calculate_router.router)
 
 @app.get("/")
 async def root():
