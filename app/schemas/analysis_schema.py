@@ -1,4 +1,4 @@
 from pydantic import BaseModel
 
-class FoodNameRequest(BaseModel):
+class AnalysisRequest(BaseModel):
     message: str
