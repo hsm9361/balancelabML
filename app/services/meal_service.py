@@ -27,9 +27,9 @@ if not GEMINI_API_KEY:
 # 운영 체제별 기본 경로 설정
 if not ALLOWED_IMAGE_DIR:
     if platform.system() == "Windows":
-        ALLOWED_IMAGE_DIR = get_upload_path
+        ALLOWED_IMAGE_DIR = get_upload_path()
     else:  # macOS, Linux
-        ALLOWED_IMAGE_DIR = get_upload_path
+        ALLOWED_IMAGE_DIR = get_upload_path()
 else:
     ALLOWED_IMAGE_DIR = Path(ALLOWED_IMAGE_DIR)
 
