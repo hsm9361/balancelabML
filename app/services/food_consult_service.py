@@ -111,6 +111,10 @@ def get_user_health_data(email: str) -> Dict[str, Any]:
                 AVG(tr.sugar) AS avg_sugar,
                 AVG(tr.water) AS avg_water,
                 AVG(tr.sodium) AS avg_sodium,
+                m.age,
+                m.gender,
+                m.height,
+                m.weight,
                 m.goal,
                 m.id
             FROM tb_members m
@@ -180,13 +184,17 @@ def process_question(question: str, email: str) -> str:
            - 당: {health_data['avg_sugar']}g
            - 섬유질: {health_data['avg_fibrin']}g
         
-        4. 사용자 목표:
-           - {health_data['goal']}
+        4. 사용자 정보:
+           - 현재 나이: {health_data['age']}
+           - 현재 성별: {health_data['gender']}
+           - 현재 키: {health_data['height']}
+           - 현재 체중: {health_data['weight']}
+           - 목표 체중: {health_data['goal']}
 
         다음 사항을 고려하여 추천해주세요:
         1. 사용자의 건강 위험도에 따른 식단 조절
         2. 부족한 영양소 보충
-        3. 사용자의 목표 달성을 위한 식단 구성
+        3. 사용자의 현재 몸무게에서 목표 몸무게로 향하기 위한 식단 구성
         4. 최근 섭취한 음식을 고려한 다양성 확보
         5. 아침, 점심, 저녁, 간식에 대한 구체적인 추천
         6. 주의사항 및 권장사항
@@ -196,8 +204,8 @@ def process_question(question: str, email: str) -> str:
         
         ```json
         {{
-            "건강 위험도 분석": "여기에 건강 위험도 분석 결과 작성"(위험도 또한 %로 출력 / 저장된 내용이 없으면 예측 권장),
-            "목표 기반 추천": "여기에 목표 기반 추천 작성",
+            "건강 위험도 분석": "여기에 건강 위험도 분석 결과 작성"(위험도는 %로 출력하고 33%이하는 확률 낮음, 66%까지는 주의, 그 이상은 위험으로 출력 / 저장된 내용이 없으면 예측 권장),
+            "목표 기반 추천": "여기에 목표 체중을 위한 식단",
             "식단 추천": {{
                 "아침": ["추천 1", "추천 2", ...],
                 "점심": ["추천 1", "추천 2", ...],
