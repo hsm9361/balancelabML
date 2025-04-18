@@ -15,6 +15,7 @@ scaler = joblib.load("app/model/scaler.pkl")
 
 # 입력 데이터 검증을 위한 Pydantic 모델
 class PredictRequest(BaseModel):
+    memberId:float
     age: float
     gender: int
     height: float
@@ -23,8 +24,8 @@ class PredictRequest(BaseModel):
     historyHypertension: int
     historyCardiovascular: int
     smokeDaily: int
-    drinkWeekly: float
-    exerciseWeekly: float
+    drinkWeekly: int
+    exerciseWeekly: int
     dailyCarbohydrate: float
     dailySugar: float
     dailyFat: float
@@ -56,6 +57,8 @@ async def predict_health(request: PredictRequest):
             request.dailyWater,
             bmi
         ]])
+        
+        print(PredictRequest)
 
         # 데이터 스케일링
         input_data_scaled = scaler.transform(input_data)
@@ -72,4 +75,5 @@ async def predict_health(request: PredictRequest):
         }
 
     except Exception as e:
+        print("예측 중 예외 발생:", e)
         raise HTTPException(status_code=500, detail=str(e))
