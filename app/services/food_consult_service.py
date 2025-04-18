@@ -112,6 +112,7 @@ def get_user_health_data(email: str) -> Dict[str, Any]:
                 AVG(tr.water) AS avg_water,
                 AVG(tr.sodium) AS avg_sodium,
                 m.age,
+                m.activity_level,
                 m.gender,
                 m.height,
                 m.weight,
@@ -147,6 +148,30 @@ def get_user_health_data(email: str) -> Dict[str, Any]:
     except Exception as e:
         print(f"❌ 사용자 데이터 조회 중 오류 발생: {str(e)}")
         return {"error": f"데이터 조회 중 오류가 발생했습니다: {str(e)}"}
+    
+def calculate_tdee(weight, height, age, gender, activity_level):
+    # Mifflin-St Jeor 공식 (남성)
+    if gender.lower() == 'male':
+        bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5
+    # Mifflin-St Jeor 공식 (여성)
+    elif gender.lower() == 'female':
+        bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161
+    else:
+        return None
+
+    activity_factors = {
+        "sedentary": 1.2,
+        "lightly_active": 1.375,
+        "moderately_active": 1.55,
+        "very_active": 1.725,
+        "extra_active": 1.9
+    }
+    factor = activity_factors.get(activity_level.lower())
+    if factor is None:
+        return None
+
+    tdee = bmr * factor
+    return tdee
 
 def process_question(question: str, email: str) -> str:
     """사용자의 질문을 처리하고 결과 반환"""
@@ -160,6 +185,14 @@ def process_question(question: str, email: str) -> str:
         # health_data 내용 검증
         if not all(key in health_data for key in ['diabetes_proba', 'goal_weight']):
             return "건강 데이터에 필요한 정보가 누락되었습니다."
+        
+        tdee_value = calculate_tdee(
+            health_data['weight'],
+            health_data['height'],
+            health_data['age'],
+            health_data['gender'],
+            health_data['activity_level']
+        )
         
         # Gemini 프롬프트 생성
         prompt = f"""
@@ -175,7 +208,7 @@ def process_question(question: str, email: str) -> str:
            - 섭취한 음식: {health_data['recent_foods']}
            - 식사 유형: {health_data['meal_time']}
         
-        3. 영양소 섭취량 (평균):
+        3. 영양소 섭취량 (최근 일주일 평균):
            - 칼로리: {health_data['avg_calories']} kcal
            - 단백질: {health_data['avg_protein']}g
            - 탄수화물: {health_data['avg_carbo']}g
@@ -187,14 +220,15 @@ def process_question(question: str, email: str) -> str:
         4. 사용자 정보:
            - 현재 나이: {health_data['age']}
            - 현재 성별: {health_data['gender']}
-           - 현재 키: {health_data['height']}
-           - 현재 체중: {health_data['weight']}
-           - 목표 체중: {health_data['goal_weight']}
+           - 현재 키: {health_data['height']}cm
+           - 현재 체중: {health_data['weight']}kg
+           - 목표 체중: {health_data['goal_weight']}kg
+           - TDEE 기반 예측 칼로리 소모량: {tdee_value:.2f} kcal
 
         다음 사항을 고려하여 추천해주세요:
         1. 사용자의 건강 위험도에 따른 식단 조절
         2. 부족한 영양소 보충
-        3. 사용자의 현재 몸무게에서 목표 몸무게로 향하기 위한 식단 구성
+        3. 사용자의 현재 몸무게에서 목표 몸무게로 향하기 위한 식단 구성(TDEE에 칼로리 소모량과 목표 체중 기반으로 6개월까지 도달하기 위한 목표 칼로리 예상하여 식단 추천)
         4. 최근 섭취한 음식을 고려한 다양성 확보
         5. 아침, 점심, 저녁, 간식에 대한 구체적인 추천
         6. 주의사항 및 권장사항
@@ -204,8 +238,8 @@ def process_question(question: str, email: str) -> str:
         
         ```json
         {{
-            "건강 위험도 분석": "여기에 건강 위험도 분석 결과 작성"(위험도는 %로 출력하고 33%이하는 확률 낮음, 66%까지는 주의, 그 이상은 위험으로 출력 / 저장된 내용이 없으면 예측 권장),
-            "목표 기반 추천": "여기에 목표 체중을 위한 식단",
+            "건강 위험도 분석": "여기에 건강 위험도 분석 결과 작성"(위험도는 %로 출력하고 30%이하는 확률 낮음, 60%까지는 주의, 그 이상은 위험으로 출력 / 저장된 내용이 없으면 예측 권장),
+            "목표 기반 추천": "여기에 목표 체중을 위한 식단"(TDEE 기반 예상 칼로리 소모량과 현재 하루 칼로리 섭취량을 알려주고, 목표 체중까지 6개월이 걸린다 가정했을 때의 목표 칼로리를 반드시 출력),
             "식단 추천": {{
                 "아침": ["추천 1", "추천 2", ...],
                 "점심": ["추천 1", "추천 2", ...],
