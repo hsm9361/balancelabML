@@ -12,7 +12,7 @@ gemini_apikey = os.environ.get("GEMINI_API_KEY")
 root = os.environ.get("root")
 
 # DB 연결 설정
-DB_URL = f"mysql+pymysql://springuser:springpassword@localhost:3306/balancelab"
+DB_URL = f"mysql+pymysql://root:{root}@192.168.0.32:3306/balancelab"
 engine = create_engine(DB_URL)
 
 # DB 연결 설정 (본인의 환경에 맞게 수정)
