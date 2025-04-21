@@ -12,13 +12,9 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ALLOWED_IMAGE_DIR = os.getenv("ALLOWED_IMAGE_DIR")
 
 def get_upload_path(upload_dir='uploads') -> Path:
-    # 사용자 홈 디렉토리 경로 얻기 (운영체제에 따라 자동 처리됨)
     home_dir = Path.home()
     upload_path = home_dir / upload_dir
-
-    # uploads 디렉토리가 없다면 생성
     upload_path.mkdir(parents=True, exist_ok=True)
-    
     return upload_path
 
 if not GEMINI_API_KEY:
@@ -36,11 +32,11 @@ else:
 # ALLOWED_IMAGE_DIR 처리
 ALLOWED_IMAGE_DIR = ALLOWED_IMAGE_DIR.resolve()
 if not ALLOWED_IMAGE_DIR.exists():
-    ALLOWED_IMAGE_DIR.mkdir(parents=True, exist_ok=True)  # 디렉토리 자동 생성
+    ALLOWED_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
 if not ALLOWED_IMAGE_DIR.is_dir():
     raise ValueError(f"ALLOWED_IMAGE_DIR은 디렉토리가 아닙니다: {ALLOWED_IMAGE_DIR}")
 
-print(f"Using ALLOWED_IMAGE_DIR: {ALLOWED_IMAGE_DIR}")  # 디버깅용
+print(f"Using ALLOWED_IMAGE_DIR: {ALLOWED_IMAGE_DIR}")
 
 # Gemini API 설정
 genai.configure(api_key=GEMINI_API_KEY)
@@ -49,16 +45,11 @@ model = genai.GenerativeModel("gemini-1.5-flash")
 # 파일 경로 검증
 def validate_file_path(file_path: str) -> str:
     try:
-        # 입력 경로를 Path 객체로 변환
         input_path = Path(file_path)
-        
-        # 상대 경로면 현재 작업 디렉토리를 기준으로 절대 경로로 변환
         if not input_path.is_absolute():
             input_path = (Path.cwd() / input_path).resolve()
         else:
             input_path = input_path.resolve()
-
-        # 파일 존재 여부 확인
         if not input_path.exists():
             raise FileNotFoundError(f"파일 {file_path}을 찾을 수 없습니다.")
         if not input_path.is_file():
@@ -70,20 +61,34 @@ def validate_file_path(file_path: str) -> str:
         raise ValueError(f"파일 경로 검증 실패: {str(e)}")
 
 # 식단 분석 함수
-def analyze_meal(file_path: str) -> list:
+def analyze_meal(file_path: str) -> dict:
     # 파일 경로 검증
     file_path = validate_file_path(file_path)
 
     # 이미지 열기
     try:
         image = Image.open(file_path)
-        image.verify()  # 이미지 유효성 검증
-        image = Image.open(file_path)  # verify 후 재오픈
+        image.verify()
+        image = Image.open(file_path)
     except Exception as e:
         raise ValueError(f"유효하지 않은 이미지 파일입니다: {str(e)}")
 
-    # Gemini API 호출
-    prompt = """
+    # 음식인지 확인하는 프롬프트
+    is_food_prompt = """
+    이 이미지가 음식을 포함하고 있는지 확인해 주세요.
+    음식이 포함되어 있으면 "Yes"를, 그렇지 않으면 "No"를 반환해 주세요.
+    다른 텍스트나 코멘트는 포함시키지 마세요.
+    """
+    try:
+        is_food_response = model.generate_content([is_food_prompt, image])
+        is_food_text = is_food_response.text.strip()
+        if is_food_text == "No":
+            return {"error": "음식 사진이 아닙니다. 음식 사진으로 바꿔주세요."}
+    except Exception as e:
+        raise Exception(f"음식 확인 API 호출 실패: {str(e)}")
+
+    # 식단 분석 프롬프트
+    analysis_prompt = """
     이 식단 이미지를 분석하여 다음 정보를 JSON 형식으로 제공해 주세요:
     {
         "nutrition_data": [
@@ -123,10 +128,11 @@ def analyze_meal(file_path: str) -> list:
     total_nutrition은 모든 음식의 영양소를 합산한 값입니다.
     deficient_nutrients는 부족한 영양소를 분석하여 나열합니다.
     next_meal_suggestion은 부족한 영양소를 보충할 수 있는 음식을 제안합니다.
+    음식이름은 한국어로 나타내주세요.
     다른 텍스트나 코멘트는 포함시키지 마세요.
     """
     try:
-        response = model.generate_content([prompt, image])
+        response = model.generate_content([analysis_prompt, image])
         response_text = response.text.strip()
         if response_text.startswith("```json"):
             response_text = response_text[7:-3].strip()
