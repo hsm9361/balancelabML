@@ -73,27 +73,26 @@ class EnhancedQueryGenerator:
         except Exception as e:
             print(f"❌ Gemini API 호출 오류 (기타): {str(e)}")
             return {"error": f"Gemini API 호출 오류: {e}"}
+        
+import re
+import json
+
+def extract_json_from_response(text: str) -> dict:
+    """Gemini 응답에서 JSON 문자열만 추출해서 파싱"""
+    try:
+        # ```json ... ``` 안의 내용만 추출
+        match = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
+        if match:
+            json_str = match.group(1)
+            return json.loads(json_str)
+        else:
+            # fallback: 혹시 코드블럭이 없으면 그냥 json.loads 시도
+            return json.loads(text)
+    except Exception as e:
+        raise ValueError(f"JSON 파싱 실패: {e}")
 
 
-# 쿼리 결과 반환
-def get_schema_info():
-    """DB 스키마 정보 가져오기"""
-    with engine.connect() as conn:
-        tables = pd.read_sql("SHOW TABLES", conn)
-        schema_info = []
-
-        for table in tables.iloc[:, 0]:
-            columns = pd.read_sql(f"DESCRIBE {table}", conn)
-            schema_info.append(f"테이블: {table}")
-            schema_info.append("컬럼:")
-            for _, row in columns.iterrows():
-                schema_info.append(f"- {row['Field']} ({row['Type']})")
-            schema_info.append("")
-
-        return "\n".join(schema_info)
-
-
-def process_question(foodList: List[Dict[str, Union[str, float]]], date: str) -> str:
+def process_question(foodList: List[Dict[str, Union[str, float]]]) -> str:
     """사용자의 질문을 처리하고 결과 반환"""
     try:
         # Gemini 프롬프트 생성
@@ -107,9 +106,6 @@ def process_question(foodList: List[Dict[str, Union[str, float]]], date: str) ->
 
         ### 음식 정보 리스트
         {foodList}
-
-        ### 날짜
-        {date}
 
         ### 당신의 역할
         - 각 음식의 영양소 정보를 검색하거나 알고 있다면 활용해서,
@@ -126,14 +122,15 @@ def process_question(foodList: List[Dict[str, Union[str, float]]], date: str) ->
         - 칼로리 (kcal)
 
         **중요 지침:**
-        - 모든 수치는 합산해서 총합으로 출력
+        - 모든 수치는 각 음식별로 출력
         - 숫자만 출력 (단위 없음)
         - JSON 형식으로 출력 (예시 참고)
+        - 설명은 필요 없이, JSON 형식을 엄격히 준수
 
         ### 출력 예시:
         ```json
         {{
-        "입력된 식단": "김밥 1줄, 사과 0.5개",
+        "입력된 식단": "김밥 1줄",
         "탄수화물": 85.1,
         "단백질": 20.3,
         "지방": 10.2,
@@ -151,8 +148,10 @@ def process_question(foodList: List[Dict[str, Union[str, float]]], date: str) ->
         answer = query_generator._call_gemini_api(prompt)
         print(f"🧪 Gemini 응답 내용: {answer}")
         
+        
         return answer
         
     except Exception as e:
         print(f"❌ process_question 중 예외 발생: {e}")
         return f"process_question 중 오류가 발생했습니다: {str(e)}"
+
