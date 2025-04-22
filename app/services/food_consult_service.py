@@ -74,24 +74,6 @@ class EnhancedQueryGenerator:
             print(f"❌ Gemini API 호출 오류 (기타): {str(e)}")
             return {"error": f"Gemini API 호출 오류: {e}"}
 
-
-# 쿼리 결과 반환
-def get_schema_info():
-    """DB 스키마 정보 가져오기"""
-    with engine.connect() as conn:
-        tables = pd.read_sql("SHOW TABLES", conn)
-        schema_info = []
-
-        for table in tables.iloc[:, 0]:
-            columns = pd.read_sql(f"DESCRIBE {table}", conn)
-            schema_info.append(f"테이블: {table}")
-            schema_info.append("컬럼:")
-            for _, row in columns.iterrows():
-                schema_info.append(f"- {row['Field']} ({row['Type']})")
-            schema_info.append("")
-
-        return "\n".join(schema_info)
-
 def get_user_health_data(email: str) -> Dict[str, Any]:
     """사용자의 건강 데이터와 목표를 가져옵니다."""
     try:

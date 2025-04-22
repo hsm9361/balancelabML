@@ -14,7 +14,6 @@ class FoodItem(BaseModel):
 
 class NutritionRequest(BaseModel):
     foodList: List[FoodItem]
-    date: str
 
     
 @router.post("/calculate", summary="음식 이름으로 영양소 계산", description="저장된 음식 이름과 날짜를 받아 해당 날짜 영양소 합산을 계산합니다")
@@ -34,9 +33,9 @@ async def get_diet_recommendation(request: NutritionRequest):
     """
     try:
         
-        result = process_question(request.foodList, request.date)
+        result = process_question(request.foodList)
         
-        return JSONResponse(content={"data":result})
+        return {"data":result}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(
