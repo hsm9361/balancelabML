@@ -74,24 +74,6 @@ class EnhancedQueryGenerator:
             print(f"❌ Gemini API 호출 오류 (기타): {str(e)}")
             return {"error": f"Gemini API 호출 오류: {e}"}
         
-import re
-import json
-
-def extract_json_from_response(text: str) -> dict:
-    """Gemini 응답에서 JSON 문자열만 추출해서 파싱"""
-    try:
-        # ```json ... ``` 안의 내용만 추출
-        match = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
-        if match:
-            json_str = match.group(1)
-            return json.loads(json_str)
-        else:
-            # fallback: 혹시 코드블럭이 없으면 그냥 json.loads 시도
-            return json.loads(text)
-    except Exception as e:
-        raise ValueError(f"JSON 파싱 실패: {e}")
-
-
 def process_question(foodList: List[Dict[str, Union[str, float]]]) -> str:
     """사용자의 질문을 처리하고 결과 반환"""
     try:
