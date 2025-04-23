@@ -34,12 +34,15 @@ class EnhancedQueryGenerator:
             "x-goog-api-key": gemini_apikey  # .env에서 로드된 API 키 사용
         }
 
-    
-
     def _call_gemini_api(self, prompt: str) -> dict:
         """Gemini API 호출 및 JSON 파싱"""
         try:
-            data = {"contents": [{"parts": [{"text": prompt}]}]}
+            data = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": 0.0
+                }
+            }
             response = requests.post(self.api_url, headers=self.headers, json=data)
 
             print("📡 상태 코드:", response.status_code)
@@ -73,6 +76,7 @@ class EnhancedQueryGenerator:
         except Exception as e:
             print(f"❌ Gemini API 호출 오류 (기타): {str(e)}")
             return {"error": f"Gemini API 호출 오류: {e}"}
+
 
 def get_user_health_data(id: float) -> Dict[str, Any]:
     """사용자의 건강 데이터와 목표를 가져옵니다."""
@@ -260,8 +264,11 @@ def process_question(id: float) -> str:
             return health_data["error"]
         
         # health_data 내용 검증
-        if not all(key in health_data for key in ['age','height','weight','gender']):
-            return "사용자 정보가 누락되었습니다."
+        required_keys = ['activity_level', 'gender', 'weight', 'height', 'age']
+        
+        if not all(key in health_data and health_data[key] is not None for key in required_keys):
+            missing_info = [key for key in required_keys if key not in health_data or health_data[key] is None]
+            return {"error": f"필수 사용자 정보가 누락되었습니다 (키, 몸무게 등 개인정보를 먼저 입력해 주세요!)"}
         
         tdee_value = calculate_tdee(
             health_data['weight'],
