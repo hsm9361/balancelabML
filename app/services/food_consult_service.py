@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from typing import Any, Dict
 import re
 import json
+from datetime import date
 
 load_dotenv(dotenv_path=".env")
 gemini_apikey = os.environ.get("GEMINI_API_KEY")
@@ -122,7 +123,7 @@ def get_user_health_data(id: float) -> Dict[str, Any]:
                     AND dr.consumed_date >= DATE_SUB(NOW(), INTERVAL 1 WEEK)
                 LEFT JOIN challenge c
                     ON c.member_id = m.id
-                    AND c.is_completed = 0
+                    AND c.status = 'ONGOING'
                 WHERE m.id = :id
                 GROUP BY m.id, m.goal_weight, pr.diabetes_proba, pr.hypertension_proba, pr.cvd_proba, 
                         c.end_date, c.goal, c.target_weight;
@@ -185,7 +186,7 @@ def calculate_tdee(weight, height, age, gender, activity_level):
     tdee = bmr * factor
     return tdee
 
-def process_goal(id:float) -> str:
+def process_goal(id: float, target_weight: float, end_date: date) -> Dict[str, Any]:
     """사용자의 질문을 처리하고 결과 반환"""
     try:
         # 사용자 건강 데이터 가져오기
@@ -195,8 +196,8 @@ def process_goal(id:float) -> str:
             return health_data["error"]
         
         # health_data 내용 검증
-        if not all(key in health_data for key in ['weight', 'height']):
-            return "사용자 정보가 누락되었습니다."
+        if not all(key in health_data for key in ['weight', 'height','age','gender','activity_level']):
+            return {"error": "사용자 정보 또는 챌린지 데이터가 누락되었습니다."}
         
         tdee_value = calculate_tdee(
             health_data['weight'],
@@ -205,7 +206,8 @@ def process_goal(id:float) -> str:
             health_data['gender'],
             health_data['activity_level']
         )
-        
+        print("목표체중: ",target_weight)
+        print("날짜: ",end_date)
         # Gemini 프롬프트 생성
         prompt = f"""
         당신은 전문 영양사입니다. 다음 사용자의 건강 데이터를 바탕으로 맞춤형 목표 영양소를 설정해주세요.
@@ -219,8 +221,8 @@ def process_goal(id:float) -> str:
            - TDEE 기반 예측 칼로리 소모량: {tdee_value:.2f} kcal
         
         2. 사용자 챌린지
-           - 목표체중: {health_data['target_weight']}
-           - 챌린지 종료 날짜: {health_data['end_date']}
+           - 목표체중: {target_weight}
+           - 챌린지 종료 날짜: {end_date}
 
         다음 사항을 고려하여 추천해주세요:
         1. 사용자 정보를 통해 tdee 기반 예측 칼로리 소모량을 확인
