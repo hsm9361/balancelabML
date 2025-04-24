@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from typing import Any, Dict
 import re
 import json
-from datetime import date
+from datetime import date, datetime
 
 load_dotenv(dotenv_path=".env")
 gemini_apikey = os.environ.get("GEMINI_API_KEY")
@@ -206,8 +206,7 @@ def process_goal(id: float, target_weight: float, end_date: date) -> Dict[str, A
             health_data['gender'],
             health_data['activity_level']
         )
-        print("목표체중: ",target_weight)
-        print("날짜: ",end_date)
+        today = datetime.today()
         # Gemini 프롬프트 생성
         prompt = f"""
         당신은 전문 영양사입니다. 다음 사용자의 건강 데이터를 바탕으로 맞춤형 목표 영양소를 설정해주세요.
@@ -223,6 +222,7 @@ def process_goal(id: float, target_weight: float, end_date: date) -> Dict[str, A
         2. 사용자 챌린지
            - 목표체중: {target_weight}
            - 챌린지 종료 날짜: {end_date}
+           - 현재 날짜: {today}
 
         다음 사항을 고려하여 추천해주세요:
         1. 사용자 정보를 통해 tdee 기반 예측 칼로리 소모량을 확인
@@ -280,6 +280,8 @@ def process_question(id: float) -> str:
             health_data['activity_level']
         )
         
+        today = datetime.today()
+        
         # Gemini 프롬프트 생성
         prompt = f"""
         당신은 전문 영양사입니다. 다음 사용자의 건강 데이터를 바탕으로 맞춤형 식단을 추천해주세요.
@@ -312,6 +314,7 @@ def process_question(id: float) -> str:
         5. 사용자 챌린지
            - 목표체중(목표가 체중변화일때): {health_data['target_weight']}
            - 목표날짜: {health_data['end_date']}
+           - 현재 날짜: {today}
 
         다음 사항을 고려하여 추천해주세요:
         1. 사용자의 건강 위험도에 따른 식단 조절
