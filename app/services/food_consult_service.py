@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from typing import Any, Dict
 import re
 import json
+from datetime import date, datetime
 
 load_dotenv(dotenv_path=".env")
 gemini_apikey = os.environ.get("GEMINI_API_KEY")
@@ -34,12 +35,15 @@ class EnhancedQueryGenerator:
             "x-goog-api-key": gemini_apikey  # .env에서 로드된 API 키 사용
         }
 
-    
-
     def _call_gemini_api(self, prompt: str) -> dict:
         """Gemini API 호출 및 JSON 파싱"""
         try:
-            data = {"contents": [{"parts": [{"text": prompt}]}]}
+            data = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": 0.0
+                }
+            }
             response = requests.post(self.api_url, headers=self.headers, json=data)
 
             print("📡 상태 코드:", response.status_code)
@@ -73,6 +77,7 @@ class EnhancedQueryGenerator:
         except Exception as e:
             print(f"❌ Gemini API 호출 오류 (기타): {str(e)}")
             return {"error": f"Gemini API 호출 오류: {e}"}
+
 
 def get_user_health_data(id: float) -> Dict[str, Any]:
     """사용자의 건강 데이터와 목표를 가져옵니다."""
@@ -118,7 +123,7 @@ def get_user_health_data(id: float) -> Dict[str, Any]:
                     AND dr.consumed_date >= DATE_SUB(NOW(), INTERVAL 1 WEEK)
                 LEFT JOIN challenge c
                     ON c.member_id = m.id
-                    AND c.is_completed = 0
+                    AND c.status = 'ONGOING'
                 WHERE m.id = :id
                 GROUP BY m.id, m.goal_weight, pr.diabetes_proba, pr.hypertension_proba, pr.cvd_proba, 
                         c.end_date, c.goal, c.target_weight;
@@ -181,7 +186,7 @@ def calculate_tdee(weight, height, age, gender, activity_level):
     tdee = bmr * factor
     return tdee
 
-def process_goal(id:float) -> str:
+def process_goal(id: float, target_weight: float, end_date: date) -> Dict[str, Any]:
     """사용자의 질문을 처리하고 결과 반환"""
     try:
         # 사용자 건강 데이터 가져오기
@@ -191,8 +196,8 @@ def process_goal(id:float) -> str:
             return health_data["error"]
         
         # health_data 내용 검증
-        if not all(key in health_data for key in ['weight', 'height']):
-            return "사용자 정보가 누락되었습니다."
+        if not all(key in health_data for key in ['weight', 'height','age','gender','activity_level']):
+            return {"error": "사용자 정보 또는 챌린지 데이터가 누락되었습니다."}
         
         tdee_value = calculate_tdee(
             health_data['weight'],
@@ -201,7 +206,7 @@ def process_goal(id:float) -> str:
             health_data['gender'],
             health_data['activity_level']
         )
-        
+        today = datetime.today()
         # Gemini 프롬프트 생성
         prompt = f"""
         당신은 전문 영양사입니다. 다음 사용자의 건강 데이터를 바탕으로 맞춤형 목표 영양소를 설정해주세요.
@@ -215,8 +220,9 @@ def process_goal(id:float) -> str:
            - TDEE 기반 예측 칼로리 소모량: {tdee_value:.2f} kcal
         
         2. 사용자 챌린지
-           - 목표체중: {health_data['target_weight']}
-           - 챌린지 종료 날짜: {health_data['end_date']}
+           - 목표체중: {target_weight}
+           - 챌린지 종료 날짜: {end_date}
+           - 현재 날짜: {today}
 
         다음 사항을 고려하여 추천해주세요:
         1. 사용자 정보를 통해 tdee 기반 예측 칼로리 소모량을 확인
@@ -260,8 +266,11 @@ def process_question(id: float) -> str:
             return health_data["error"]
         
         # health_data 내용 검증
-        if not all(key in health_data for key in ['age','height','weight','gender']):
-            return "사용자 정보가 누락되었습니다."
+        required_keys = ['activity_level', 'gender', 'weight', 'height', 'age']
+        
+        if not all(key in health_data and health_data[key] is not None for key in required_keys):
+            missing_info = [key for key in required_keys if key not in health_data or health_data[key] is None]
+            return {"error": f"필수 사용자 정보가 누락되었습니다 (키, 몸무게 등 개인정보를 먼저 입력해 주세요!)"}
         
         tdee_value = calculate_tdee(
             health_data['weight'],
@@ -270,6 +279,8 @@ def process_question(id: float) -> str:
             health_data['gender'],
             health_data['activity_level']
         )
+        
+        today = datetime.today()
         
         # Gemini 프롬프트 생성
         prompt = f"""
@@ -301,14 +312,14 @@ def process_question(id: float) -> str:
            - TDEE 기반 예측 칼로리 소모량: {tdee_value:.2f} kcal
         
         5. 사용자 챌린지
-           - 목표: {health_data['goal']}
            - 목표체중(목표가 체중변화일때): {health_data['target_weight']}
            - 목표날짜: {health_data['end_date']}
+           - 현재 날짜: {today}
 
         다음 사항을 고려하여 추천해주세요:
         1. 사용자의 건강 위험도에 따른 식단 조절
         2. 부족한 영양소 보충
-        3. 사용자 챌린지를 기반으로 목표 체중을 목표 날짜까지 도달하기 위한 칼로리를 계산
+        3. 사용자 챌린지를 기반으로 목표 체중을 목표 날짜까지 도달하기 위한 칼로리를 계산 (사용자 챌린지에 내용이 없으면 챌린지를 하도록 권유)
         4. 건강한 체중조절을 위한 건강한 식단으로 추천
         5. 최근 섭취한 음식을 고려한 다양성 확보
         6. 아침, 점심, 저녁, 간식에 대한 구체적인 추천
@@ -320,7 +331,7 @@ def process_question(id: float) -> str:
         ```json
         {{
             "건강 위험도 분석": "여기에 건강 위험도 분석 결과 작성"(위험도는 %로 출력하고 30%이하는 확률 낮음, 60%까지는 주의, 그 이상은 위험으로 출력 / 저장된 내용이 없으면 예측 권장),
-            "목표 기반 추천": "여기에 목표 체중을 위한 식단"(TDEE 기반 예상 칼로리 소모량과 현재 하루 칼로리 섭취량을 알려주고, 목표 체중까지 6개월이 걸린다 가정했을 때의 목표 칼로리를 반드시 출력),
+            "목표 기반 추천": "사용자 챌린지를 기반으로 목표 체중을 목표 날짜까지 도달하기 위한 칼로리를 계산 (사용자 챌린지에 내용이 없으면 챌린지를 하도록 권유),
             "식단 추천": {{
                 "아침": ["추천 1", "추천 2", ...],
                 "점심": ["추천 1", "추천 2", ...],
